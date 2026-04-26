@@ -25,6 +25,11 @@ dependencies {
     implementation(ktorLibs.server.sessions)
     implementation(libs.logback.classic)
 
+    implementation(libs.hikari.cp)
+    implementation(libs.mysql.connector)
+    implementation(libs.jdbi.core)
+    implementation(libs.jdbi.kotlin)
+
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)
 }
