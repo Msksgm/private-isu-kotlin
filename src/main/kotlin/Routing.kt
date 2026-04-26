@@ -7,9 +7,11 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.freemarker.*
+import io.ktor.server.http.content.staticFiles
 import io.ktor.server.sessions.*
 import org.jdbi.v3.core.Jdbi
 import org.jdbi.v3.core.kotlin.KotlinPlugin
+import java.io.File
 
 private val dataSource: HikariDataSource by lazy {
     HikariDataSource(HikariConfig().apply {
@@ -49,8 +51,14 @@ fun Application.configureRouting() {
             dbInitialize()
             call.respond(HttpStatusCode.OK)
         }
-        get("/html-freemarker") {
-            call.respond(FreeMarkerContent("index.ftl", mapOf("data" to IndexData(listOf(1, 2, 3))), ""))
+        get("/login") {
+            call.respond(
+                FreeMarkerContent(
+                    "login.ftl",
+                    mapOf("flash" to ""),
+                    ""
+                )
+            )
         }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
@@ -60,5 +68,7 @@ fun Application.configureRouting() {
             call.sessions.set(session.copy(count = session.count + 1))
             call.respondText("Counter is ${session.count}. Refresh to increment.")
         }
+
+        staticFiles("/", File("/home/public"))
     }
 }
