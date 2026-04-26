@@ -16,6 +16,11 @@ RUN --mount=type=cache,target=/root/.gradle \
 ################################################################################
 FROM eclipse-temurin:21-jre AS final
 
+RUN \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    apt-get update -qq && apt-get install -y openssl
+
 ARG UID=10001
 RUN useradd --uid ${UID} --create-home --shell /sbin/nologin appuser
 USER appuser

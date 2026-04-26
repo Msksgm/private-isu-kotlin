@@ -42,6 +42,26 @@ private fun dbInitialize() {
     }
 }
 
+private fun digest(src: String): String {
+    val cmd = """printf "%s" ${escapeshellarg(src)} | openssl dgst -sha512 | sed 's/^.*= //'"""
+    val process = ProcessBuilder("/bin/bash", "-c", cmd)
+        .redirectErrorStream(true)
+        .start()
+    val output = process.inputStream.bufferedReader().use { it.readText() }
+    return output.trim()
+}
+
+// goの実装を参考にしたので、自前でエスケープ関数を作成
+private fun escapeshellarg(s: String): String {
+    return "'" + s.replace("'", "'\\''") + "'"
+}
+
+private fun calculateSalt(accountName: String): String = digest(accountName)
+
+private fun calculatePasshash(accountName: String, password: String): String {
+    return digest("$password:${calculateSalt(accountName)}")
+}
+
 fun Application.configureRouting() {
     routing {
         get("/") {
