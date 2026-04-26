@@ -3,7 +3,7 @@ package io.github.msksgm
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import freemarker.cache.*
+import io.ktor.http.HttpStatusCode
 import io.ktor.server.freemarker.*
 import io.ktor.server.sessions.*
 
@@ -11,6 +11,9 @@ fun Application.configureRouting() {
     routing {
         get("/") {
             call.respondText("Hello, World!")
+        }
+        get("/initialize") {
+            call.respond(HttpStatusCode.OK)
         }
         get("/html-freemarker") {
             call.respond(FreeMarkerContent("index.ftl", mapOf("data" to IndexData(listOf(1, 2, 3))), ""))
