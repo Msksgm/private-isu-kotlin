@@ -30,6 +30,8 @@ dependencies {
     implementation(libs.jdbi.core)
     implementation(libs.jdbi.kotlin)
 
+    implementation(libs.xmemcached)
+
     testImplementation(kotlin("test"))
     testImplementation(ktorLibs.server.testHost)
 }

@@ -9,9 +9,37 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.freemarker.*
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.sessions.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import net.rubyeye.xmemcached.MemcachedClient
 import org.jdbi.v3.core.Jdbi
 import org.jdbi.v3.core.kotlin.KotlinPlugin
 import java.io.File
+
+class MemcachedSessionStorage(
+    private val client: MemcachedClient,
+    private val keyPrefix: String = "isuconp-kotlin.session:",
+    private val expirationSeconds: Int = 3600,
+) : SessionStorage {
+    override suspend fun write(id: String, value: String) {
+        withContext(Dispatchers.IO) {
+            client.set("$keyPrefix$id", expirationSeconds, value)
+        }
+    }
+
+    override suspend fun read(id: String): String {
+        return withContext(Dispatchers.IO) {
+            client.get<String>("$keyPrefix$id")
+                ?: throw NoSuchElementException("Session $id not found")
+        }
+    }
+
+    override suspend fun invalidate(id: String) {
+        withContext(Dispatchers.IO) {
+            client.delete("$keyPrefix$id")
+        }
+    }
+}
 
 private val dataSource: HikariDataSource by lazy {
     HikariDataSource(HikariConfig().apply {
