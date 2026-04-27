@@ -6,15 +6,31 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.Parameters
 import io.ktor.server.freemarker.*
 import io.ktor.server.http.content.staticFiles
+import io.ktor.server.request.receive
 import io.ktor.server.sessions.*
+import io.ktor.server.sessions.get
+import io.ktor.server.sessions.sessions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.rubyeye.xmemcached.MemcachedClient
 import org.jdbi.v3.core.Jdbi
+import org.jdbi.v3.core.kotlin.mapTo
 import org.jdbi.v3.core.kotlin.KotlinPlugin
 import java.io.File
+import java.time.OffsetDateTime
+import kotlin.random.Random
+
+data class User(
+    val id: Int,
+    val accountName: String,
+    val passhash: String,
+    val authority: Int,
+    val delFlg: Int,
+    val createdAt: OffsetDateTime
+)
 
 class MemcachedSessionStorage(
     private val client: MemcachedClient,
@@ -90,6 +106,65 @@ private fun calculatePasshash(accountName: String, password: String): String {
     return digest("$password:${calculateSalt(accountName)}")
 }
 
+private fun secureRandomStr(length: Int): String {
+    return Random.nextBytes(length).joinToString("") { "%02x".format(it) }
+}
+
+private fun tryLogin(accountName: String?, password: String?): User? {
+    if (accountName == null || password == null) {
+        return null
+    }
+    val user = jdbi.withHandle<User?, Exception> { h ->
+        h.createQuery("SELECT * FROM users WHERE account_name = :name AND del_flg = 0")
+            .bind("name", accountName)
+            .mapTo<User>()
+            .findOne()
+            .orElse(null)
+    }
+
+    return if (calculatePasshash(accountName, password) == user?.passhash) {
+        user
+    } else {
+        null
+    }
+}
+
+private fun ApplicationCall.getSessionUser(): User? {
+    val session = sessions.get<UserSession>() ?: return null
+    val userId = session.userId
+
+    val user = jdbi.withHandle<User?, Exception> { h ->
+        h.createQuery("SELECT * FROM users WHERE id = :user_id")
+            .bind("user_id", userId)
+            .mapTo<User>()
+            .findOne()
+            .orElse(null)
+    }
+
+    return user
+}
+
+private suspend fun RoutingContext.postLogin() {
+    if (call.getSessionUser() != null) {
+        call.respondRedirect("/")
+        return
+    }
+
+    val params = call.receive<Parameters>()
+    val accountName = params["account_name"]
+    val password = params["password"]
+
+    val user = tryLogin(accountName, password)
+
+    if (user != null) {
+        call.sessions.set(UserSession(userId = user.id, csrfToken = secureRandomStr(16)))
+        call.respondRedirect("/")
+    } else {
+        call.sessions.set(UserSession(notice = "アカウント名かパスワードが間違っています"))
+        call.respondRedirect("/login")
+    }
+}
+
 fun Application.configureRouting() {
     routing {
         get("/") {
@@ -108,13 +183,9 @@ fun Application.configureRouting() {
                 )
             )
         }
+        post("/login") { postLogin() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
-        }
-        get("/session/increment") {
-            val session = call.sessions.get<MySession>() ?: MySession()
-            call.sessions.set(session.copy(count = session.count + 1))
-            call.respondText("Counter is ${session.count}. Refresh to increment.")
         }
 
         staticFiles("/", File("/home/public"))

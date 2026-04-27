@@ -11,7 +11,7 @@ fun Application.configureSecurity() {
     val storage = MemcachedSessionStorage(memcachedClient)
 
     install(Sessions) {
-        cookie<MySession>("isuconp-kotlin.session", storage) {
+        cookie<UserSession>("isuconp-kotlin.session", storage) {
             cookie.extensions["SameSite"] = "lax"
         }
     }
