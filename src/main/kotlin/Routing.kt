@@ -144,6 +144,32 @@ private fun ApplicationCall.getSessionUser(): User? {
     return user
 }
 
+private fun ApplicationCall.getFlash(): String {
+    val session = sessions.get<UserSession>() ?: return ""
+    val notice = session.notice
+    sessions.set(session.copy(notice = ""))
+    return notice
+}
+
+private suspend fun RoutingContext.getLogin() {
+    val me = call.getSessionUser()
+
+    if (me != null) {
+        call.respondRedirect("/")
+        return
+    }
+
+    val flash = call.getFlash()
+
+    call.respond(
+        FreeMarkerContent(
+            "login.ftl",
+            mapOf("flash" to flash),
+            ""
+        )
+    )
+}
+
 private suspend fun RoutingContext.postLogin() {
     if (call.getSessionUser() != null) {
         call.respondRedirect("/")
@@ -174,15 +200,7 @@ fun Application.configureRouting() {
             dbInitialize()
             call.respond(HttpStatusCode.OK)
         }
-        get("/login") {
-            call.respond(
-                FreeMarkerContent(
-                    "login.ftl",
-                    mapOf("flash" to ""),
-                    ""
-                )
-            )
-        }
+        get("/login") { getLogin() }
         post("/login") { postLogin() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
