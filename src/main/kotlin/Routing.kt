@@ -151,6 +151,11 @@ private fun ApplicationCall.getFlash(): String {
     return notice
 }
 
+private suspend fun RoutingContext.getInitialize() {
+    dbInitialize()
+    call.respond(HttpStatusCode.OK)
+}
+
 private suspend fun RoutingContext.getLogin() {
     val me = call.getSessionUser()
 
@@ -196,10 +201,7 @@ fun Application.configureRouting() {
         get("/") {
             call.respondText("Hello, World!")
         }
-        get("/initialize") {
-            dbInitialize()
-            call.respond(HttpStatusCode.OK)
-        }
+        get("/initialize") { getInitialize() }
         get("/login") { getLogin() }
         post("/login") { postLogin() }
         get("/json/kotlinx-serialization") {
