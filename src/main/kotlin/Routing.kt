@@ -196,6 +196,11 @@ private suspend fun RoutingContext.postLogin() {
     }
 }
 
+private suspend fun RoutingContext.getLogout() {
+    call.sessions.clear<UserSession>()
+    call.respondRedirect("/")
+}
+
 fun Application.configureRouting() {
     routing {
         get("/") {
@@ -204,6 +209,7 @@ fun Application.configureRouting() {
         get("/initialize") { getInitialize() }
         get("/login") { getLogin() }
         post("/login") { postLogin() }
+        get("/logout") { getLogout() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
