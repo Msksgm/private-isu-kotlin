@@ -196,6 +196,20 @@ private suspend fun RoutingContext.postLogin() {
     }
 }
 
+private suspend fun RoutingContext.getRegister() {
+    if (call.getSessionUser() != null) {
+        call.respondRedirect("/")
+        return
+    }
+
+    call.respond(
+        FreeMarkerContent(
+            "register.ftl",
+            mapOf("flash" to call.getFlash()),
+        )
+    )
+}
+
 private suspend fun RoutingContext.getLogout() {
     call.sessions.clear<UserSession>()
     call.respondRedirect("/")
@@ -209,6 +223,7 @@ fun Application.configureRouting() {
         get("/initialize") { getInitialize() }
         get("/login") { getLogin() }
         post("/login") { postLogin() }
+        get("/register") { getRegister() }
         get("/logout") { getLogout() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
