@@ -86,6 +86,12 @@ private fun dbInitialize() {
     }
 }
 
+private fun validateUser(accountName: String?, password: String?): Boolean {
+    if (accountName == null || password == null) return false
+    return Regex("^[a-zA-Z0-9_]{3,}$").matches(accountName) &&
+        Regex("^[a-zA-Z0-9_]{6,}$").matches(password)
+}
+
 private fun digest(src: String): String {
     val cmd = """printf "%s" ${escapeshellarg(src)} | openssl dgst -sha512 | sed 's/^.*= //'"""
     val process = ProcessBuilder("/bin/bash", "-c", cmd)
@@ -210,6 +216,50 @@ private suspend fun RoutingContext.getRegister() {
     )
 }
 
+private suspend fun RoutingContext.postRegister() {
+    if (call.getSessionUser() != null) {
+        call.respondRedirect("/")
+        return
+    }
+
+    val params = call.receive<Parameters>()
+    val accountName = params["account_name"]
+    val password = params["password"]
+
+    val validated  = validateUser(accountName, password)
+    if (!validated) {
+        call.sessions.set(UserSession(notice = "アカウント名は3文字以上、パスワードは6文字以上である必要があります"))
+        call.respondRedirect("/register")
+        return
+    }
+
+    val exists = jdbi.withHandle<Int, Exception> { h ->
+        h.createQuery("SELECT 1 FROM users WHERE account_name = :account_name")
+            .bind("account_name", accountName)
+            .mapTo<Int>()
+            .findOne()
+            .orElse(0)
+    } == 1
+
+    if (exists) {
+        call.sessions.set(UserSession(notice = "アカウント名がすでに使われています"))
+        call.respondRedirect("/register")
+        return
+    }
+
+    val userId = jdbi.withHandle<Int, Exception> { h ->
+        h.createUpdate("INSERT INTO users (account_name, passhash) VALUES (:account_name, :passhash)")
+            .bind("account_name", accountName)
+            .bind("passhash", calculatePasshash(accountName!!, password!!))
+            .executeAndReturnGeneratedKeys("id")
+            .mapTo<Int>()
+            .one()
+    }
+
+    call.sessions.set(UserSession(userId = userId, csrfToken = secureRandomStr(16)))
+    call.respondRedirect("/")
+}
+
 private suspend fun RoutingContext.getLogout() {
     call.sessions.clear<UserSession>()
     call.respondRedirect("/")
@@ -224,6 +274,7 @@ fun Application.configureRouting() {
         get("/login") { getLogin() }
         post("/login") { postLogin() }
         get("/register") { getRegister() }
+        post("/register") { postRegister() }
         get("/logout") { getLogout() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
