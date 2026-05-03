@@ -21,7 +21,10 @@ import org.jdbi.v3.core.kotlin.mapTo
 import org.jdbi.v3.core.kotlin.KotlinPlugin
 import java.io.File
 import java.time.OffsetDateTime
+import kotlin.jvm.optionals.getOrNull
 import kotlin.random.Random
+
+const val postsPerPage = 20
 
 data class User(
     val id: Int,
@@ -30,6 +33,28 @@ data class User(
     val authority: Int,
     val delFlg: Int,
     val createdAt: OffsetDateTime
+)
+
+data class Post(
+    val id: Int,
+    val userId: Int,
+    var imgData: ByteArray? = null,
+    val body: String,
+    val mime: String,
+    val createdAt: OffsetDateTime,
+    var commentCount: Int = 0,
+    var comments: List<Comment> = emptyList(),
+    var user: User? = null,
+    var csrfToken: String = "",
+)
+
+data class Comment(
+    val id: Int,
+    val postId: Int,
+    val userId: Int,
+    val comment: String,
+    val createdAt: OffsetDateTime,
+    var user: User? = null,
 )
 
 class MemcachedSessionStorage(
@@ -157,6 +182,78 @@ private fun ApplicationCall.getFlash(): String {
     return notice
 }
 
+object TemplateHelpers {
+    fun imageUrl(post: Post): String {
+        val ext = when (post.mime) {
+            "image/jpeg" -> ".jpg"
+            "image/png" -> ".png"
+            "image/gif" -> ".gif"
+            else -> ""
+        }
+        return "/image/${post.id}$ext"
+    }
+}
+
+private fun makePosts(results: List<Post>, csrfToken: String, allComments: Boolean): List<Post> {
+    val posts = mutableListOf<Post>()
+
+    for (post in results) {
+        post.commentCount = jdbi.withHandle<Int, Exception> { h ->
+            h.createQuery("SELECT COUNT(*) AS count FROM comments WHERE post_id = :post_id")
+                .bind("post_id", post.id)
+                .mapTo<Int>()
+                .findOne()
+                .orElse(0)
+        }
+
+
+        var query = "SELECT * FROM comments WHERE post_id = :post_id ORDER BY created_at DESC"
+        if (!allComments) {
+            query += " LIMIT 3"
+        }
+
+        val comments = jdbi.withHandle<MutableList<Comment>, Exception> { h ->
+            h.createQuery(query)
+                .bind("post_id", post.id)
+                .mapTo<Comment>()
+                .list()
+        }
+
+        for (i in comments.indices) {
+            comments[i].user = jdbi.withHandle<User, Exception> { h ->
+                h.createQuery("SELECT * FROM users WHERE id = :id")
+                    .bind("id", comments[i].userId)
+                    .mapTo<User>()
+                    .findOne()
+                    .getOrNull()
+            }
+        }
+
+        // reverse
+        comments.reverse()
+        post.comments = comments
+
+        post.user = jdbi.withHandle<User, Exception> { h ->
+            h.createQuery("SELECT * FROM users WHERE id = :id")
+                .bind("id", post.userId)
+                .mapTo<User>()
+                .findOne()
+                .orElse(null)
+        }
+
+        post.csrfToken = csrfToken
+
+        if (post.user?.delFlg == 0) {
+            posts.add(post)
+        }
+        if (posts.size >= postsPerPage) {
+            break
+        }
+    }
+
+    return posts
+}
+
 private suspend fun RoutingContext.getInitialize() {
     dbInitialize()
     call.respond(HttpStatusCode.OK)
@@ -265,17 +362,43 @@ private suspend fun RoutingContext.getLogout() {
     call.respondRedirect("/")
 }
 
+private suspend fun RoutingContext.getIndex() {
+    val me = call.getSessionUser()
+    val results = jdbi.withHandle<List<Post>, Exception> { h ->
+        h.createQuery("SELECT id, user_id, body, mime, created_at FROM posts ORDER BY created_at DESC")
+            .mapTo<Post>()
+            .list()
+    }
+
+
+    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
+    val posts = makePosts(results, csrfToken, false)
+
+    val flash = call.getFlash()
+
+    call.respond(
+        FreeMarkerContent(
+            "index.ftl",
+            mapOf(
+                "posts" to posts,
+                "me" to me,
+                "csrf_token" to csrfToken,
+                "flash" to flash,
+                "h" to TemplateHelpers,
+            )
+        )
+    )
+}
+
 fun Application.configureRouting() {
     routing {
-        get("/") {
-            call.respondText("Hello, World!")
-        }
         get("/initialize") { getInitialize() }
         get("/login") { getLogin() }
         post("/login") { postLogin() }
         get("/register") { getRegister() }
         post("/register") { postRegister() }
         get("/logout") { getLogout() }
+        get("/") { getIndex() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
