@@ -638,6 +638,39 @@ private suspend fun RoutingContext.getAdminBanned() {
     )
 }
 
+private suspend fun RoutingContext.postAdminBanned() {
+    val me = call.getSessionUser()
+
+    if (me == null) {
+        call.respondRedirect("/")
+        return
+    }
+
+    if (me.authority == 0) {
+        call.respond(HttpStatusCode.Forbidden)
+        return
+    }
+
+    val params = call.receive<Parameters>()
+    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
+
+    if (params["csrf_token"] != csrfToken) {
+        call.respond(HttpStatusCode.UnprocessableEntity)
+        return
+    }
+
+    val uids = params.getAll("uid[]") ?: emptyList()
+    jdbi.useHandle<Exception> { h ->
+        for (id in uids) {
+            h.createUpdate("UPDATE users SET del_flg = 1 WHERE id = :id")
+                .bind("id", id)
+                .execute()
+        }
+    }
+
+    call.respondRedirect("/admin/banned")
+}
+
 fun Application.configureRouting() {
     routing {
         get("/initialize") { getInitialize() }
@@ -653,6 +686,7 @@ fun Application.configureRouting() {
         get("/image/{image_path}") { getImage() }
         post("/comment") { postComment() }
         get("/admin/banned") { getAdminBanned() }
+        post("/admin/banned") { postAdminBanned() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
