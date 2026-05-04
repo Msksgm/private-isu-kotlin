@@ -422,6 +422,38 @@ private suspend fun RoutingContext.getImage() {
     return
 }
 
+private suspend fun RoutingContext.postComment() {
+    val me = call.getSessionUser()
+    if (me == null) {
+        call.respondRedirect("/login")
+        return
+    }
+
+    val params = call.receive<Parameters>()
+
+    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
+    if (params["csrf_token"] != csrfToken) {
+        call.respond(HttpStatusCode.UnprocessableEntity)
+        return
+    }
+
+    val postId = params["post_id"]?.toIntOrNull()
+    if (postId == null) {
+        call.application.log.warn("post_idは整数のみです")
+        return
+    }
+
+    jdbi.withHandle<Unit, Exception> { h ->
+        h.createUpdate("INSERT INTO comments (post_id, user_id, comment) VALUES (:post_id, :user_id, :comment)")
+            .bind("post_id", postId)
+            .bind("user_id", me.id)
+            .bind("comment", params["comment"])
+            .execute()
+    }
+
+    call.respondRedirect("/posts/$postId")
+}
+
 fun Application.configureRouting() {
     routing {
         get("/initialize") { getInitialize() }
@@ -432,6 +464,7 @@ fun Application.configureRouting() {
         get("/logout") { getLogout() }
         get("/") { getIndex() }
         get("/image/{image_path}") { getImage() }
+        post("/comment") { postComment() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
