@@ -8,9 +8,13 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Parameters
+import io.ktor.http.content.PartData
+import io.ktor.http.content.forEachPart
+import io.ktor.http.content.streamProvider
 import io.ktor.server.freemarker.*
 import io.ktor.server.http.content.staticFiles
 import io.ktor.server.request.receive
+import io.ktor.server.request.receiveMultipart
 import io.ktor.server.sessions.*
 import io.ktor.server.sessions.get
 import io.ktor.server.sessions.sessions
@@ -26,6 +30,7 @@ import kotlin.jvm.optionals.getOrNull
 import kotlin.random.Random
 
 const val postsPerPage = 20
+const val UploadLimit = 10 * 1024 * 1024
 
 data class User(
     val id: Int,
@@ -428,6 +433,79 @@ private suspend fun RoutingContext.getPostsId() {
     )
 }
 
+private suspend fun RoutingContext.postIndex() {
+    val me = call.getSessionUser()
+    if (me == null) {
+        call.respondRedirect("/login")
+        return
+    }
+
+    val multipart = call.receiveMultipart()
+    var csrfTokenParam: String? = null
+    var bodyParam: String? = null
+    var fileBytes: ByteArray? = null
+    var fileContentType: String? = null
+
+    multipart.forEachPart { part ->
+        when (part) {
+            is PartData.FormItem -> when (part.name) {
+                "csrf_token" -> csrfTokenParam = part.value
+                "body" -> bodyParam = part.value
+            }
+            is PartData.FileItem -> if (part.name == "file") {
+                fileContentType = part.contentType?.toString()
+                fileBytes = part.streamProvider().readBytes()
+            }
+            else -> {}
+        }
+        part.dispose()
+    }
+
+    if (csrfTokenParam != call.sessions.get<UserSession>()?.csrfToken) {
+        call.respond(HttpStatusCode.UnprocessableEntity)
+        return
+    }
+
+    if (fileBytes == null) {
+        val session = call.sessions.get<UserSession>() ?: UserSession()
+        call.sessions.set(session.copy(notice = "画像が必須です"))
+        call.respondRedirect("/")
+        return
+    }
+
+    val mime = when {
+        fileContentType?.contains("jpeg") == true -> "image/jpeg"
+        fileContentType?.contains("png") == true -> "image/png"
+        fileContentType?.contains("gif") == true -> "image/gif"
+        else -> {
+            val session = call.sessions.get<UserSession>() ?: UserSession()
+            call.sessions.set(session.copy(notice = "投稿できる画像形式はjpgとpngとgifだけです"))
+            call.respondRedirect("/")
+            return
+        }
+    }
+
+    if (fileBytes.size > UploadLimit) {
+        val session = call.sessions.get<UserSession>() ?: UserSession()
+        call.sessions.set(session.copy(notice = "ファイルサイズが大きすぎます"))
+        call.respondRedirect("/")
+        return
+    }
+
+    val pid = jdbi.withHandle<Int, Exception> { h ->
+        h.createUpdate("INSERT INTO posts (user_id, mime, imgdata, body) VALUES (:user_id,:mime,:imgdata,:body)")
+            .bind("user_id", me.id)
+            .bind("mime", mime)
+            .bind("imgdata", fileBytes)
+            .bind("body", bodyParam)
+            .executeAndReturnGeneratedKeys("id")
+            .mapTo<Int>()
+            .one()
+    }
+
+    call.respondRedirect("/posts/${pid}")
+}
+
 private suspend fun RoutingContext.getImage() {
     val imagePath = call.parameters["image_path"] ?: return
     val parts = imagePath.split(".")
@@ -501,6 +579,7 @@ fun Application.configureRouting() {
         get("/logout") { getLogout() }
         get("/") { getIndex() }
         get("/posts/{id}") { getPostsId() }
+        post("/") { postIndex() }
         get("/image/{image_path}") { getImage() }
         post("/comment") { postComment() }
         get("/json/kotlinx-serialization") {
