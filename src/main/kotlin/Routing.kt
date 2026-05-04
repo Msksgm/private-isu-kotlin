@@ -2,6 +2,7 @@ package io.github.msksgm
 
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
+import io.ktor.http.ContentType
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -390,6 +391,37 @@ private suspend fun RoutingContext.getIndex() {
     )
 }
 
+private suspend fun RoutingContext.getImage() {
+    val imagePath = call.parameters["image_path"] ?: return
+    val parts = imagePath.split(".")
+    if (parts.size != 2) return
+
+    val pid = parts[0].toIntOrNull()
+    if (pid == null) {
+        call.respond(HttpStatusCode.NotFound)
+        return
+    }
+
+    val post = jdbi.withHandle<Post?, Exception> { h ->
+        h.createQuery("SELECT * FROM posts WHERE id = :id")
+            .bind("id", pid)
+            .mapTo<Post>()
+            .findOne()
+            .orElse(null)
+    } ?: return
+
+    val ext = parts[1]
+
+    if (ext == "jpg" && post.mime == "image/jpeg" ||
+        ext == "png" && post.mime == "image/png" ||
+        ext == "gif" && post.mime == "image/gif") {
+        call.respondBytes(post.imgData!!, ContentType.parse(post.mime))
+        return
+    }
+    call.respond(HttpStatusCode.NotFound)
+    return
+}
+
 fun Application.configureRouting() {
     routing {
         get("/initialize") { getInitialize() }
@@ -399,6 +431,7 @@ fun Application.configureRouting() {
         post("/register") { postRegister() }
         get("/logout") { getLogout() }
         get("/") { getIndex() }
+        get("/image/{image_path}") { getImage() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
