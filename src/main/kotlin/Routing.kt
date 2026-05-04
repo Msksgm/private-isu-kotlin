@@ -26,6 +26,8 @@ import org.jdbi.v3.core.kotlin.mapTo
 import org.jdbi.v3.core.kotlin.KotlinPlugin
 import java.io.File
 import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
 import kotlin.jvm.optionals.getOrNull
 import kotlin.random.Random
 
@@ -396,6 +398,41 @@ private suspend fun RoutingContext.getIndex() {
     )
 }
 
+private suspend fun RoutingContext.getPosts() {
+    val maxCreatedAt = call.request.queryParameters["max_created_at"] ?: return
+
+    val t: OffsetDateTime = try {
+        OffsetDateTime.parse(maxCreatedAt)
+    } catch (e: DateTimeParseException) {
+        call.application.log.warn(e.message)
+        return
+    }
+
+    val results = jdbi.withHandle<List<Post>, Exception> { h ->
+        h.createQuery("SELECT id, user_id, body, mime, created_at FROM posts WHERE created_at <= :created_at ORDER BY created_at DESC")
+            .bind("created_at", t.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
+            .mapTo<Post>()
+            .list()
+    }
+
+    val posts = makePosts(results, call.sessions.get<UserSession>()?.csrfToken ?: "", false)
+
+    if (posts.isEmpty()) {
+        call.respond(HttpStatusCode.NotFound)
+        return
+    }
+
+    call.respond(
+        FreeMarkerContent(
+            "posts.ftl",
+            mapOf(
+                "posts" to posts,
+                "h" to TemplateHelpers,
+            )
+        )
+    )
+}
+
 private suspend fun RoutingContext.getPostsId() {
     val pid = call.parameters["id"]?.toIntOrNull()
     if (pid == null) {
@@ -578,6 +615,7 @@ fun Application.configureRouting() {
         post("/register") { postRegister() }
         get("/logout") { getLogout() }
         get("/") { getIndex() }
+        get("/posts") { getPosts() }
         get("/posts/{id}") { getPostsId() }
         post("/") { postIndex() }
         get("/image/{image_path}") { getImage() }
