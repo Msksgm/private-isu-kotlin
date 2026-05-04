@@ -606,6 +606,38 @@ private suspend fun RoutingContext.postComment() {
     call.respondRedirect("/posts/$postId")
 }
 
+private suspend fun RoutingContext.getAdminBanned() {
+    val me = call.getSessionUser()
+
+    if (me == null) {
+        call.respondRedirect("/")
+        return
+    }
+
+    if (me.authority == 0) {
+        call.respond(HttpStatusCode.Forbidden)
+        return
+    }
+
+    val users = jdbi.withHandle<List<User>, Exception> { h ->
+        h.createQuery("SELECT * FROM users WHERE authority = 0 AND del_flg = 0 ORDER BY created_at DESC")
+            .mapTo<User>()
+            .list()
+    }
+
+    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
+    call.respond(
+        FreeMarkerContent(
+            "banned.ftl",
+            mapOf(
+                "users" to users,
+                "me" to me,
+                "csrf_token" to csrfToken,
+            )
+        )
+    )
+}
+
 fun Application.configureRouting() {
     routing {
         get("/initialize") { getInitialize() }
@@ -620,6 +652,7 @@ fun Application.configureRouting() {
         post("/") { postIndex() }
         get("/image/{image_path}") { getImage() }
         post("/comment") { postComment() }
+        get("/admin/banned") { getAdminBanned() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
