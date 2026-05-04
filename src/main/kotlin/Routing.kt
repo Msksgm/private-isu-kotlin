@@ -391,6 +391,43 @@ private suspend fun RoutingContext.getIndex() {
     )
 }
 
+private suspend fun RoutingContext.getPostsId() {
+    val pid = call.parameters["id"]?.toIntOrNull()
+    if (pid == null) {
+        call.respond(HttpStatusCode.NotFound)
+        return
+    }
+
+    val results = jdbi.withHandle<List<Post>, Exception> { h ->
+        h.createQuery("SELECT * FROM posts WHERE id = :id")
+            .bind("id", pid)
+            .mapTo<Post>()
+            .list()
+    }
+
+    val posts = makePosts(results, call.sessions.get<UserSession>()?.csrfToken ?: "", true)
+
+    if (posts.isEmpty()) {
+        call.respond(HttpStatusCode.NotFound)
+        return
+    }
+
+    val post = posts.first()
+
+    val me = call.getSessionUser()
+
+    call.respond(
+        FreeMarkerContent(
+            "post_id.ftl",
+            mapOf(
+                "post" to post,
+                "me" to me,
+                "h" to TemplateHelpers,
+            )
+        )
+    )
+}
+
 private suspend fun RoutingContext.getImage() {
     val imagePath = call.parameters["image_path"] ?: return
     val parts = imagePath.split(".")
@@ -463,6 +500,7 @@ fun Application.configureRouting() {
         post("/register") { postRegister() }
         get("/logout") { getLogout() }
         get("/") { getIndex() }
+        get("/posts/{id}") { getPostsId() }
         get("/image/{image_path}") { getImage() }
         post("/comment") { postComment() }
         get("/json/kotlinx-serialization") {
