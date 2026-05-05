@@ -18,8 +18,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 現在は **フェーズ 2**: 独立リポジトリでの運用確立段階。
   - 2-1 ✅ `git filter-repo` で抽出
   - 2-2 ✅ 独立 CI 構築
-  - 2-3 ⏳ Renovate 設定
-  - 2-4 ⏳ `Msksgm/private-isu:kotlin-impl` への同期メカニズム
+  - 2-3 ✅ Renovate 設定
+  - 2-4 ✅ `Msksgm/private-isu:kotlin-impl` への同期メカニズム
   - 2-5 ⏳ AMI プロビジョニング
 
 ## エンドポイント完成の定義 (DoD)

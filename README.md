@@ -10,9 +10,14 @@ Ktor + JDBI + FreeMarker で、Go リファレンス実装（`webapp/golang/app.
 
 ## このリポジトリについて
 
-このリポジトリは upstream フォーク [Msksgm/private-isu](https://github.com/Msksgm/private-isu) の `kotlin-impl` ブランチと CI で同期される予定です。同期の仕組みが整えば、`Msksgm/private-isu` を clone して `git switch kotlin-impl` するだけで Kotlin 実装を試せるようになります。
+このリポジトリ `Msksgm/private-isu-kotlin` が **真の master** です。
+upstream フォーク [Msksgm/private-isu](https://github.com/Msksgm/private-isu/tree/kotlin-impl) の `kotlin-impl` ブランチは、本リポジトリ `main` への push をトリガに `.github/workflows/sync-to-fork.yml` で `webapp/kotlin/` 配下へ自動同期される **読み取り専用ミラー** です。
 
-ただし現時点では同期メカニズムは未構築（WIP）のため、下記 `Using` の手順に従って本リポジトリを `webapp/kotlin` 配下に `git clone` してください。
+- 編集はすべて本リポジトリ (`Msksgm/private-isu-kotlin`) で行ってください。
+- `Msksgm/private-isu` の `kotlin-impl` ブランチの `webapp/kotlin/` 配下に直接 commit しても、次回 sync で **上書きされます**。
+- `webapp/public/`, `webapp/golang/`, `webapp/etc/` 等、`webapp/kotlin/` 以外は同期対象外で無傷です。
+
+`Msksgm/private-isu` を clone して `git switch kotlin-impl` するだけで Kotlin 実装を試せます。
 
 ## Using
 
@@ -24,7 +29,7 @@ Kotlin で起動するためには以下の手順が必要です。
     cd webapp
     git clone https://github.com/Msksgm/private-isu-kotlin.git kotlin
     ```
-    > **NOTE:** 将来的には [Msksgm/private-isu](https://github.com/Msksgm/private-isu) の `kotlin-impl` ブランチに切り替えるだけで済む予定です（CI による同期は WIP）。
+    > **NOTE:** [Msksgm/private-isu](https://github.com/Msksgm/private-isu/tree/kotlin-impl) を clone して `git switch kotlin-impl` する場合、本手順は不要です（`webapp/kotlin/` に同期済み）。
 3. `webapp/docker-compose.yml` の `app.build` を `kotlin` に変更する。
 4. 起動する。
     ```sh

@@ -1,0 +1,110 @@
+name: sync-to-fork
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Show diff only, do not push"
+        type: boolean
+        default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  TARGET_REPO: Msksgm/private-isu
+  TARGET_BRANCH: kotlin-impl
+  TARGET_SUBDIR: webapp/kotlin
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout source (private-isu-kotlin)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Generate GitHub App token for target
+        id: app-token
+        uses: actions/create-github-app-token@f8d387b68d61c58ab83c6c016672934102569859 # v3.0.0
+        with:
+          app-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: Msksgm
+          repositories: private-isu
+
+      - name: Checkout target (private-isu kotlin-impl)
+        run: |
+          git clone --depth=1 --branch "$TARGET_BRANCH" \
+            "https://x-access-token:${GH_TOKEN}@github.com/${TARGET_REPO}.git" target
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Stage whitelisted paths
+        run: |
+          set -euo pipefail
+          PATHS=(src gradle gradlew gradlew.bat build.gradle.kts settings.gradle.kts gradle.properties Dockerfile README.md .gitignore)
+          rm -rf staging
+          mkdir -p staging
+          for p in "${PATHS[@]}"; do
+            if [ -e "source/$p" ]; then
+              cp -R "source/$p" "staging/$p"
+            else
+              echo "WARN: source/$p missing, skipping" >&2
+            fi
+          done
+          if [ -z "$(ls -A staging)" ]; then
+            echo "ERROR: staging is empty; aborting to avoid wiping target/${TARGET_SUBDIR}" >&2
+            exit 1
+          fi
+
+      - name: Rsync staging into target/webapp/kotlin
+        run: |
+          set -euo pipefail
+          mkdir -p "target/${TARGET_SUBDIR}"
+          rsync -av --delete staging/ "target/${TARGET_SUBDIR}/"
+
+      - name: Compute commit metadata
+        id: meta
+        run: |
+          short_sha=$(git -C source rev-parse --short HEAD)
+          echo "short_sha=${short_sha}" >> "$GITHUB_OUTPUT"
+
+      - name: Show diff
+        working-directory: target
+        run: |
+          git status
+          git --no-pager diff --stat
+          git --no-pager diff | head -n 500 || true
+
+      - name: Commit and push
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run != true }}
+        working-directory: target
+        env:
+          SHORT_SHA: ${{ steps.meta.outputs.short_sha }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes; skipping commit."
+            exit 0
+          fi
+          git commit -m "sync: from private-isu-kotlin@${SHORT_SHA}"
+          git push origin "$TARGET_BRANCH"
+
+      - name: Dry-run notice
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+        run: echo "Dry run: diff shown above, no push performed."
