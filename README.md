@@ -43,3 +43,59 @@ Kotlin で起動するためには以下の手順が必要です。
     2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
     2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
     ```
+
+## Bench
+
+ローカルで benchmarker を走らせる手順です。CI（`.github/workflows/bench.yml`）と同等のフローを手元で再現できます。
+
+### 必要なもの
+
+- Docker（compose v2）と `unzip`, `jq`
+- 数 GB の空き容量（`img.zip` が数百 MB、展開後はさらに使う）
+
+### 手順
+
+1. seed データ（`dump.sql.bz2`）を取得する。MySQL の `/docker-entrypoint-initdb.d` が起動時に自動展開して投入する。
+    ```sh
+    mkdir -p sql
+    curl -L --fail -o sql/dump.sql.bz2 \
+      https://github.com/catatsuy/private-isu/releases/download/img/dump.sql.bz2
+    ```
+
+2. アプリ stack（nginx + app + mysql + memcached）を起動する。
+    ```sh
+    docker compose up --build -d
+    ```
+
+    MySQL の seed 投入完了は `docker compose logs mysql` で確認できる。`http://localhost/` にアクセスして 200 が返れば準備完了。
+
+3. upstream から benchmarker のソースと userdata（bench 用画像）を取得し、image を build する。`userdata/img.zip` の取得・展開を忘れずに（しないと `panic: invalid argument to IntN` になる）。
+    ```sh
+    git clone --depth=1 https://github.com/catatsuy/private-isu /tmp/upstream
+    cd /tmp/upstream/benchmarker/userdata
+    curl -L --fail -O \
+      https://github.com/catatsuy/private-isu/releases/download/img/img.zip
+    unzip -qq -o img.zip
+    cd -
+    docker build -t private-isu-benchmarker /tmp/upstream/benchmarker
+    ```
+
+4. compose ネットワークに join して bench を実行する。
+    ```sh
+    NET=$(docker network ls --format '{{.Name}}' | grep private-isu-kotlin)
+    docker run --network "$NET" -i private-isu-benchmarker \
+      /bin/benchmarker -t http://nginx -u /opt/userdata \
+      | tee benchmark_output.json
+    ```
+
+5. 結果を確認する。`pass: true` であれば bench を通過。
+    ```sh
+    jq . benchmark_output.json
+    # {"pass":true,"score":1738,"success":1652,"fail":1,"messages":[...]}
+    ```
+
+### 後片付け
+
+```sh
+docker compose down -v
+```

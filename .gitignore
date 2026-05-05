@@ -34,3 +34,6 @@ local.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# Bench seed (fetched at runtime via curl from upstream releases)
+sql/dump.sql.bz2
