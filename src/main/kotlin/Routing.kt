@@ -757,9 +757,6 @@ fun Application.configureRouting() {
         get("/admin/banned") { getAdminBanned() }
         post("/admin/banned") { postAdminBanned() }
         get(Regex("""/@(?<accountName>[0-9a-zA-Z_]+)""")) { getAccountName() }
-        get("/json/kotlinx-serialization") {
-            call.respond(mapOf("hello" to "world"))
-        }
 
         staticFiles("/", File("/home/public"))
     }
