@@ -1,5 +1,9 @@
 # private-isu Kotlin 実装
 
+[![bench](https://github.com/Msksgm/private-isu-kotlin/actions/workflows/bench.yml/badge.svg?branch=main)](https://github.com/Msksgm/private-isu-kotlin/actions/workflows/bench.yml)
+[![hadolint](https://github.com/Msksgm/private-isu-kotlin/actions/workflows/hadolint.yml/badge.svg?branch=main)](https://github.com/Msksgm/private-isu-kotlin/actions/workflows/hadolint.yml)
+[![osv-scanner](https://github.com/Msksgm/private-isu-kotlin/actions/workflows/osv-scanner-scheduled.yml/badge.svg?branch=main)](https://github.com/Msksgm/private-isu-kotlin/actions/workflows/osv-scanner-scheduled.yml)
+
 [private-isu](https://github.com/catatsuy/private-isu) に Kotlin 実装を追加するためのリポジトリです。
 Ktor + JDBI + FreeMarker で、Go リファレンス実装（`webapp/golang/app.go`）を移植しています。
 現状、Docker Compose と `./gradlew run` でのローカル起動に対応しています。

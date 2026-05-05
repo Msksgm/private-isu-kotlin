@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **フェーズ 1**（フォーク内実装 + ベンチマーカー pass）は **2026-05-05** に完了。
 - 現在は **フェーズ 2**: 独立リポジトリでの運用確立段階。
   - 2-1 ✅ `git filter-repo` で抽出
-  - 2-2 ⏳ 独立 CI 構築（フェーズ 2 完了判定）
+  - 2-2 ✅ 独立 CI 構築
   - 2-3 ⏳ Renovate 設定
   - 2-4 ⏳ `Msksgm/private-isu:kotlin-impl` への同期メカニズム
   - 2-5 ⏳ AMI プロビジョニング
