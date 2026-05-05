@@ -469,12 +469,17 @@ private suspend fun RoutingContext.getAccountName() {
 }
 
 private suspend fun RoutingContext.getPosts() {
-    val maxCreatedAt = call.request.queryParameters["max_created_at"] ?: return
+    val maxCreatedAt = call.request.queryParameters["max_created_at"]
+    if (maxCreatedAt == null) {
+        call.respond(HttpStatusCode.OK)
+        return
+    }
 
     val t: OffsetDateTime = try {
         OffsetDateTime.parse(maxCreatedAt)
     } catch (e: DateTimeParseException) {
         call.application.log.warn(e.message)
+        call.respond(HttpStatusCode.OK)
         return
     }
 
@@ -616,7 +621,10 @@ private suspend fun RoutingContext.postIndex() {
 private suspend fun RoutingContext.getImage() {
     val imagePath = call.parameters["image_path"] ?: return
     val parts = imagePath.split(".")
-    if (parts.size != 2) return
+    if (parts.size != 2) {
+        call.respond(HttpStatusCode.NotFound)
+        return
+    }
 
     val pid = parts[0].toIntOrNull()
     if (pid == null) {
@@ -661,6 +669,7 @@ private suspend fun RoutingContext.postComment() {
     val postId = params["post_id"]?.toIntOrNull()
     if (postId == null) {
         call.application.log.warn("post_idは整数のみです")
+        call.respond(HttpStatusCode.OK)
         return
     }
 
