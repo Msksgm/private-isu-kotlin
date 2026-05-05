@@ -1,33 +1,45 @@
-# private-isu-kotlin
+# private-isu Kotlin 実装
 
-This project was created using the [Ktor Project Generator](https://start.ktor.io).
+[private-isu](https://github.com/catatsuy/private-isu) に Kotlin 実装を追加するためのリポジトリです。
+Ktor + JDBI + FreeMarker で、Go リファレンス実装（`webapp/golang/app.go`）を移植しています。
+現状、Docker Compose と `./gradlew run` でのローカル起動に対応しています。
 
-Here are some useful links to get you started:
- * [Ktor Documentation](https://ktor.io/docs/home.html)
- * [Ktor GitHub page](https://github.com/ktorio/ktor)
- * [Ktor Slack chat](https://app.slack.com/client/T09229ZC6/C0A974TJ9). [Request an invite](https://surveys.jetbrains.com/s3/kotlin-slack-sign-up).
+## このリポジトリについて
 
+このリポジトリは upstream フォーク [Msksgm/private-isu](https://github.com/Msksgm/private-isu) の `kotlin-impl` ブランチと CI で同期される予定です。同期の仕組みが整えば、`Msksgm/private-isu` を clone して `git switch kotlin-impl` するだけで Kotlin 実装を試せるようになります。
 
-## Features
-Here's a list of features included in this project:
+ただし現時点では同期メカニズムは未構築（WIP）のため、下記 `Using` の手順に従って本リポジトリを `webapp/kotlin` 配下に `git clone` してください。
 
-| Name | Description |
-|------|-------------|
-| [Content Negotiation](https://start.ktor.io/p/io.ktor/server-content-negotiation) | Provides automatic content conversion according to Content-Type and Accept headers |
-| [kotlinx.serialization](https://start.ktor.io/p/io.ktor/server-kotlinx-serialization) | Handles JSON serialization using kotlinx.serialization library |
-| [Sessions](https://start.ktor.io/p/io.ktor/server-sessions) | Adds support for persistent sessions through cookies or headers |
-| [Freemarker](https://start.ktor.io/p/io.ktor/server-freemarker) | Serves HTML content using Apache's FreeMarker template engine |
+## Using
 
+Kotlin で起動するためには以下の手順が必要です。
 
-## Building & Running
-To build or run the project, use one of the following tasks:
+1. private-isu の [README.md](https://github.com/catatsuy/private-isu/blob/master/README.md#docker-compose) に従って、MySQL に初期データを import する。
+2. private-isu の `webapp` に本リポジトリを追加する。
+    ```sh
+    cd webapp
+    git clone https://github.com/Msksgm/private-isu-kotlin.git kotlin
+    ```
+    > **NOTE:** 将来的には [Msksgm/private-isu](https://github.com/Msksgm/private-isu) の `kotlin-impl` ブランチに切り替えるだけで済む予定です（CI による同期は WIP）。
+3. `webapp/docker-compose.yml` の `app.build` を `kotlin` に変更する。
+4. 起動する。
+    ```sh
+    cd webapp
+    docker compose up
+    ```
+5. (Option) ローカルで起動する場合は以下を実行する。MySQL と Memcached への接続先は環境変数で渡す（カッコ内はデフォルト値）。
+    ```sh
+    export ISUCONP_DB_HOST=localhost   # default: localhost
+    export ISUCONP_DB_PORT=3306        # default: 3306
+    export ISUCONP_DB_NAME=isuconp     # default: isuconp
+    export ISUCONP_DB_USER=root        # default: root
+    export ISUCONP_DB_PASSWORD=root    # default: root
+    export ISUCONP_MEMCACHED_ADDRESS=localhost  # default: localhost
 
-
-| Task | Description |
-|------|-------------|
-
-If the server starts successfully, you'll see the following output:
-```
-2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
-2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
-```
+    ./gradlew run
+    ```
+    JDK は Gradle Toolchain で JDK 21 が自動解決されます。起動に成功すると以下のように表示されます。
+    ```
+    2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
+    2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
+    ```
