@@ -107,4 +107,5 @@ jobs:
 
       - name: Dry-run notice
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
-        run: echo "Dry run: diff shown above, no push performed."
+        run: |
+          echo "Dry run: diff shown above, no push performed."
