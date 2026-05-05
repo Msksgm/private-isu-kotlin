@@ -28,6 +28,7 @@ import java.io.File
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
+import kotlin.jvm.optionals.getOrElse
 import kotlin.jvm.optionals.getOrNull
 import kotlin.random.Random
 
@@ -398,6 +399,72 @@ private suspend fun RoutingContext.getIndex() {
     )
 }
 
+private suspend fun RoutingContext.getAccountName() {
+    val accountName = call.parameters["accountName"] ?: ""
+
+    val user = jdbi.withHandle<User?, Exception> { h ->
+        h.createQuery("SELECT * FROM users WHERE account_name = :account_name AND del_flg = 0")
+            .bind("account_name", accountName)
+            .mapTo<User>()
+            .findOne()
+            .getOrNull()
+    } ?: run {
+        call.respond(HttpStatusCode.NotFound)
+        return
+    }
+
+    val results = jdbi.withHandle<List<Post>, Exception> { h ->
+        h.createQuery("SELECT id, user_id, body, mime, created_at FROM posts WHERE user_id = :user_id ORDER BY created_at DESC")
+            .bind("user_id", user.id)
+            .mapTo<Post>()
+            .list()
+    }
+
+    val posts = makePosts(results, call.sessions.get<UserSession>()?.csrfToken ?: "", false)
+
+    val commentCount = jdbi.withHandle<Int, Exception> { h ->
+        h.createQuery("SELECT COUNT(*) AS count FROM comments WHERE user_id = :user_id")
+            .bind("user_id", user.id)
+            .mapTo<Int>()
+            .findOne()
+            .getOrElse({ 0 })
+    }
+
+    val postIds = jdbi.withHandle<List<Int>, Exception> { h ->
+        h.createQuery("SELECT id FROM posts WHERE user_id = :user_id")
+            .bind("user_id", user.id)
+            .mapTo<Int>()
+            .list()
+    }
+    val postCount = postIds.size
+
+    val commentedCount = if (postCount > 0) {
+        jdbi.withHandle<Int, Exception> { h ->
+            h.createQuery("SELECT COUNT(*) AS count FROM `comments` WHERE `post_id` IN (<post_ids>)")
+                .bindList("post_ids", postIds)
+                .mapTo<Int>()
+                .one()
+        }
+    } else 0
+
+    val me = call.getSessionUser()
+
+    call.respond(
+        FreeMarkerContent(
+            "user.ftl",
+            mapOf(
+                "posts" to posts,
+                "user" to user,
+                "post_count" to postCount,
+                "comment_count" to commentCount,
+                "commented_count" to commentedCount,
+                "me" to me,
+                "h" to TemplateHelpers,
+                ),
+        )
+    )
+}
+
 private suspend fun RoutingContext.getPosts() {
     val maxCreatedAt = call.request.queryParameters["max_created_at"] ?: return
 
@@ -687,6 +754,7 @@ fun Application.configureRouting() {
         post("/comment") { postComment() }
         get("/admin/banned") { getAdminBanned() }
         post("/admin/banned") { postAdminBanned() }
+        get(Regex("""/@(?<accountName>[0-9a-zA-Z_]+)""")) { getAccountName() }
         get("/json/kotlinx-serialization") {
             call.respond(mapOf("hello" to "world"))
         }
