@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:21.0.10_7-jdk AS build
 WORKDIR /src
 
 COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts gradle.properties ./
@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/root/.gradle \
     ./gradlew --no-daemon installDist
 
 ################################################################################
-FROM eclipse-temurin:21-jre AS final
+FROM eclipse-temurin:21.0.10_7-jre AS final
 
 RUN \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
