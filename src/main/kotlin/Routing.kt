@@ -619,14 +619,7 @@ private suspend fun RoutingContext.postIndex() {
 }
 
 private suspend fun RoutingContext.getImage() {
-    val imagePath = call.parameters["image_path"] ?: return
-    val parts = imagePath.split(".")
-    if (parts.size != 2) {
-        call.respond(HttpStatusCode.NotFound)
-        return
-    }
-
-    val pid = parts[0].toIntOrNull()
+    val pid = call.parameters["id"]!!.toIntOrNull()
     if (pid == null) {
         call.respond(HttpStatusCode.NotFound)
         return
@@ -640,7 +633,7 @@ private suspend fun RoutingContext.getImage() {
             .orElse(null)
     } ?: return
 
-    val ext = parts[1]
+    val ext = call.parameters["ext"]!!
 
     if (ext == "jpg" && post.mime == "image/jpeg" ||
         ext == "png" && post.mime == "image/png" ||
@@ -759,7 +752,7 @@ fun Application.configureRouting() {
         get("/posts") { getPosts() }
         get("/posts/{id}") { getPostsId() }
         post("/") { postIndex() }
-        get("/image/{image_path}") { getImage() }
+        get(Regex("""/image/(?<id>\w+)\.(?<ext>\w+)""")) { getImage() }
         post("/comment") { postComment() }
         get("/admin/banned") { getAdminBanned() }
         post("/admin/banned") { postAdminBanned() }
