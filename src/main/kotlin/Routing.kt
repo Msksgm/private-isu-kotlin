@@ -146,6 +146,10 @@ private fun calculatePasshash(accountName: String, password: String): String {
     return digest("$password:${calculateSalt(accountName)}")
 }
 
+private fun ApplicationCall.getCsrfToken(): String {
+    return sessions.get<UserSession>()?.csrfToken ?: ""
+}
+
 private fun secureRandomStr(length: Int): String {
     return Random.nextBytes(length).joinToString("") { "%02x".format(it) }
 }
@@ -380,8 +384,7 @@ private suspend fun RoutingContext.getIndex() {
     }
 
 
-    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
-    val posts = makePosts(results, csrfToken, false)
+    val posts = makePosts(results, call.getCsrfToken(), false)
 
     val flash = call.getFlash()
 
@@ -391,7 +394,7 @@ private suspend fun RoutingContext.getIndex() {
             mapOf(
                 "posts" to posts,
                 "me" to me,
-                "csrf_token" to csrfToken,
+                "csrf_token" to call.getCsrfToken(),
                 "flash" to flash,
                 "h" to TemplateHelpers,
             )
@@ -420,7 +423,7 @@ private suspend fun RoutingContext.getAccountName() {
             .list()
     }
 
-    val posts = makePosts(results, call.sessions.get<UserSession>()?.csrfToken ?: "", false)
+    val posts = makePosts(results, call.getCsrfToken(), false)
 
     val commentCount = jdbi.withHandle<Int, Exception> { h ->
         h.createQuery("SELECT COUNT(*) AS count FROM comments WHERE user_id = :user_id")
@@ -482,7 +485,7 @@ private suspend fun RoutingContext.getPosts() {
             .list()
     }
 
-    val posts = makePosts(results, call.sessions.get<UserSession>()?.csrfToken ?: "", false)
+    val posts = makePosts(results, call.getCsrfToken(), false)
 
     if (posts.isEmpty()) {
         call.respond(HttpStatusCode.NotFound)
@@ -514,7 +517,7 @@ private suspend fun RoutingContext.getPostsId() {
             .list()
     }
 
-    val posts = makePosts(results, call.sessions.get<UserSession>()?.csrfToken ?: "", true)
+    val posts = makePosts(results, call.getCsrfToken(), true)
 
     if (posts.isEmpty()) {
         call.respond(HttpStatusCode.NotFound)
@@ -565,7 +568,7 @@ private suspend fun RoutingContext.postIndex() {
         part.dispose()
     }
 
-    if (csrfTokenParam != call.sessions.get<UserSession>()?.csrfToken) {
+    if (csrfTokenParam != call.getCsrfToken()) {
         call.respond(HttpStatusCode.UnprocessableEntity)
         return
     }
@@ -650,8 +653,7 @@ private suspend fun RoutingContext.postComment() {
 
     val params = call.receive<Parameters>()
 
-    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
-    if (params["csrf_token"] != csrfToken) {
+    if (params["csrf_token"] != call.getCsrfToken()) {
         call.respond(HttpStatusCode.UnprocessableEntity)
         return
     }
@@ -692,14 +694,13 @@ private suspend fun RoutingContext.getAdminBanned() {
             .list()
     }
 
-    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
     call.respond(
         FreeMarkerContent(
             "banned.ftl",
             mapOf(
                 "users" to users,
                 "me" to me,
-                "csrf_token" to csrfToken,
+                "csrf_token" to call.getCsrfToken(),
             )
         )
     )
@@ -719,9 +720,8 @@ private suspend fun RoutingContext.postAdminBanned() {
     }
 
     val params = call.receive<Parameters>()
-    val csrfToken = call.sessions.get<UserSession>()?.csrfToken ?: ""
 
-    if (params["csrf_token"] != csrfToken) {
+    if (params["csrf_token"] != call.getCsrfToken()) {
         call.respond(HttpStatusCode.UnprocessableEntity)
         return
     }
