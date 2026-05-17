@@ -762,6 +762,6 @@ fun Application.configureRouting() {
         post("/admin/banned") { postAdminBanned() }
         get(Regex("""/@(?<accountName>[0-9a-zA-Z_]+)""")) { getAccountName() }
 
-        staticFiles("/", File("/home/public"))
+        staticFiles("/", File("../public"))
     }
 }
