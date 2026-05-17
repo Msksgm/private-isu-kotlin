@@ -37,3 +37,5 @@ Thumbs.db
 
 # Bench seed (fetched at runtime via curl from upstream releases)
 sql/dump.sql.bz2
+
+provisioning/hosts
