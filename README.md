@@ -11,32 +11,32 @@ Ktor + JDBI + FreeMarker で、Go リファレンス実装（`webapp/golang/app.
 ## このリポジトリについて
 
 このリポジトリ `Msksgm/private-isu-kotlin` が **真の master** です。
-upstream フォーク [Msksgm/private-isu](https://github.com/Msksgm/private-isu/tree/kotlin-impl) の `kotlin-impl` ブランチは、本リポジトリ `main` への push をトリガに `.github/workflows/sync-to-fork.yml` で `webapp/kotlin/` 配下へ自動同期される **読み取り専用ミラー** です。
+upstream フォーク [Msksgm/private-isu](https://github.com/Msksgm/private-isu/tree/kotlin-impl) の `kotlin-impl` ブランチは、本リポジトリ `main` への push をトリガに `.github/workflows/sync-to-fork.yml` で `webapp/kotlin/` 配下へ自動同期される **読み取り専用ミラー** です。`kotlin-impl` を `master` へマージすることは想定していません。
 
 - 編集はすべて本リポジトリ (`Msksgm/private-isu-kotlin`) で行ってください。
 - `Msksgm/private-isu` の `kotlin-impl` ブランチの `webapp/kotlin/` 配下に直接 commit しても、次回 sync で **上書きされます**。
 - `webapp/public/`, `webapp/golang/`, `webapp/etc/` 等、`webapp/kotlin/` 以外は同期対象外で無傷です。
 
-`Msksgm/private-isu` を clone して `git switch kotlin-impl` するだけで Kotlin 実装を試せます。
+## ローカルでの動作確認
 
-## Using
+本家 `catatsuy/private-isu` を clone し、その `webapp/` 配下に本リポジトリを `kotlin/` として追加する形で動作確認します。
 
-Kotlin で起動するためには以下の手順が必要です。
-
-1. private-isu の [README.md](https://github.com/catatsuy/private-isu/blob/master/README.md#docker-compose) に従って、MySQL に初期データを import する。
-2. private-isu の `webapp` に本リポジトリを追加する。
+1. `catatsuy/private-isu` を clone する。
+    ```sh
+    git clone https://github.com/catatsuy/private-isu.git
+    cd private-isu
+    ```
+2. `webapp/` 配下に本リポジトリを `kotlin/` として clone する。
     ```sh
     cd webapp
     git clone https://github.com/Msksgm/private-isu-kotlin.git kotlin
     ```
-    > **NOTE:** [Msksgm/private-isu](https://github.com/Msksgm/private-isu/tree/kotlin-impl) を clone して `git switch kotlin-impl` する場合、本手順は不要です（`webapp/kotlin/` に同期済み）。
 3. `webapp/docker-compose.yml` の `app.build` を `kotlin` に変更する。
 4. 起動する。
     ```sh
-    cd webapp
     docker compose up
     ```
-5. (Option) ローカルで起動する場合は以下を実行する。MySQL と Memcached への接続先は環境変数で渡す（カッコ内はデフォルト値）。
+5. (Option) Gradle で直接起動する場合は、MySQL と Memcached を別途用意したうえで以下を実行する（カッコ内はデフォルト値）。
     ```sh
     export ISUCONP_DB_HOST=localhost   # default: localhost
     export ISUCONP_DB_PORT=3306        # default: 3306
@@ -52,6 +52,19 @@ Kotlin で起動するためには以下の手順が必要です。
     2024-12-04 14:32:45.584 [main] INFO  Application - Application started in 0.303 seconds.
     2024-12-04 14:32:45.682 [main] INFO  Application - Responding at http://0.0.0.0:8080
     ```
+
+## EC2 での動作確認
+
+`catatsuy/private-isu` が提供する AMI から EC2 インスタンスを起動し、本リポジトリの Ansible playbook でデプロイします。詳細な手順は [`provisioning/README.md`](provisioning/README.md) を参照してください。
+
+```sh
+# hosts.tmpl から hosts を作成し、PUBLIC_IP と鍵パスを書き換える
+cp provisioning/hosts{.tmpl,}
+# $EDITOR provisioning/hosts
+
+# playbook を実行する
+ansible-playbook -i provisioning/hosts provisioning/image/ansible/playbooks.yml
+```
 
 ## Bench
 
