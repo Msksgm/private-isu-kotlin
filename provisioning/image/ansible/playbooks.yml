@@ -6,7 +6,7 @@
   vars:
     repo_url: https://github.com/Msksgm/private-isu-kotlin.git
     repo_branch: main
-    app_dir: /home/isucon/private-isu-kotlin
+    app_dir: /home/isucon/private_isu/webapp/kotlin
     isucon_user: isucon
     dist_bin: "{{ app_dir }}/build/install/private-isu-kotlin/bin/private-isu-kotlin"
 

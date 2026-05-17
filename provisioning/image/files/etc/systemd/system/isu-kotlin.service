@@ -6,14 +6,14 @@ After=network.target mysql.service memcached.service
 Type=simple
 User=isucon
 Group=isucon
-WorkingDirectory=/home/isucon/private-isu-kotlin
+WorkingDirectory=/home/isucon/private_isu/webapp/kotlin
 Environment=ISUCONP_DB_HOST=localhost
 Environment=ISUCONP_DB_PORT=3306
 Environment=ISUCONP_DB_NAME=isuconp
 Environment=ISUCONP_DB_USER=isuconp
 Environment=ISUCONP_DB_PASSWORD=isuconp
 Environment=ISUCONP_MEMCACHED_ADDRESS=localhost:11211
-ExecStart=/home/isucon/private-isu-kotlin/build/install/private-isu-kotlin/bin/private-isu-kotlin
+ExecStart=/home/isucon/private_isu/webapp/kotlin/build/install/private-isu-kotlin/bin/private-isu-kotlin
 Restart=on-failure
 RestartSec=2
 
