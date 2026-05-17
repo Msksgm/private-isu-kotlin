@@ -19,14 +19,6 @@
         update_cache: yes
         cache_valid_time: 3600
 
-    - name: Symlink /home/public to base AMI's webapp/public
-      become: yes
-      file:
-        src: /home/isucon/private_isu/webapp/public
-        dest: /home/public
-        state: link
-        force: yes
-
     - name: Clone private-isu-kotlin
       become: yes
       become_user: "{{ isucon_user }}"
