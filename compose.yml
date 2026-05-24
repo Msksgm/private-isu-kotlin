@@ -2,7 +2,7 @@ name: private-isu-kotlin
 
 services:
   nginx:
-    image: nginx:1.27
+    image: nginx:1.30
     depends_on:
       - app
     volumes:
